@@ -11,7 +11,7 @@ class PgStatementTest {
 
     @BeforeTest
     fun beforeEach() {
-        //pgDebug = true
+        pgDebug = true
         ds = PgDataSource("postgresql://admin:mysecretpassword@localhost:5432/s57server", 1)
         assertEquals(1, ds.readyCount)
         runBlocking {
@@ -32,8 +32,11 @@ class PgStatementTest {
     @Test
     fun testStatement() {
         val chartNames = runBlocking {
-            ds.connection().use {
-                it.statement("SELECT name from charts LIMIT 3;")
+            ds.connection().use { conn ->
+                conn.statement(
+                    "insert into testing VALUES (1, 'foo'), (2, 'bar'), (3, 'baz');"
+                ).execute()
+                conn.statement("SELECT name from testing LIMIT 3;")
                     .executeQuery().use { result ->
                         val names = mutableListOf<String>()
                         while (result.next()) {
@@ -47,19 +50,22 @@ class PgStatementTest {
 
         assertEquals(
             listOf(
-                "US2WC03M.000",
-                "US5WA22M.000",
-                "US3WA46M.000",
+                "foo",
+                "bar",
+                "baz",
             ), chartNames
         )
     }
 
     @Test
     fun testStatementParams() {
-        val chartNames = runBlocking {
-            ds.connection().use {
-                it.statement("SELECT name from charts LIMIT $1;")
-                    .setInt(1, 3)
+        val names = runBlocking {
+            ds.connection().use { conn ->
+                conn.statement(
+                    "insert into testing VALUES (1, 'foo'), (2, 'bar'), (3, 'baz');"
+                ).execute()
+                conn.statement("SELECT name from testing LIMIT $1;")
+                    .setInt(1, 2)
                     .executeQuery().use { result ->
                         val names = mutableListOf<String>()
                         while (result.next()) {
@@ -73,10 +79,9 @@ class PgStatementTest {
 
         assertEquals(
             listOf(
-                "US2WC03M.000",
-                "US5WA22M.000",
-                "US3WA46M.000",
-            ), chartNames
+                "foo",
+                "bar",
+            ), names
         )
     }
 
@@ -100,6 +105,7 @@ class PgStatementTest {
             }
         }
     }
+
     @Test
     fun testExecute100Params() {
         runBlocking {
@@ -116,8 +122,8 @@ class PgStatementTest {
                 println("binding params")
                 (1..99).forEach {
                     if (it % 2 == 1) {
-                        stmt.setLong(it, 10000L +it)
-                        stmt.setString(it+1, "value ${it+1}")
+                        stmt.setLong(it, 10000L + it)
+                        stmt.setString(it + 1, "value ${it + 1}")
                     }
                 }
                 println("executing insert")
@@ -135,7 +141,7 @@ class PgStatementTest {
                         count++
                     }
                 }
-                assertEquals(50, count )
+                assertEquals(50, count)
             }
 
             ds.connection().use { conn ->
@@ -148,7 +154,7 @@ class PgStatementTest {
                         count++
                     }
                 }
-                assertEquals(50, count )
+                assertEquals(50, count)
                 count = 0
                 conn.prepareStatement("select * from testing;").executeQuery().use { resultSet ->
                     while (resultSet.next()) {
@@ -158,7 +164,7 @@ class PgStatementTest {
                         count++
                     }
                 }
-                assertEquals(50, count )
+                assertEquals(50, count)
             }
         }
     }

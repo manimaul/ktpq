@@ -36,7 +36,7 @@ class PgDb(
             val conn = PQconnectdb(info)
             val status = PQstatus(conn)
             require(status == ConnStatusType.CONNECTION_OK) {
-                conn.error()
+                conn.error(true)
             }
             return PgDb(conn!!)
         }
@@ -53,7 +53,7 @@ class PgDb(
             )
             val status = PQstatus(conn)
             require(status == ConnStatusType.CONNECTION_OK) {
-                conn.error()
+                conn.error(true)
             }
             return PgDb(conn!!)
         }
@@ -86,19 +86,25 @@ fun CPointer<PGresult>?.check(conn: CPointer<PGconn>): CPointer<PGresult> {
         pgDbLogD("status ($status) = $statusStr")
     }
     check(status == PGRES_TUPLES_OK || status == PGRES_COMMAND_OK || status == PGRES_COPY_IN) {
+        pgDbLogD("clear")
         clear()
-        conn.error()
+        conn.error(false)
     }
     return checkNotNull(this)
 }
 
-private fun CPointer<PGconn>?.error(): String {
-    val errorMessage = PQerrorMessage(this)!!.toKString()
-    if (errorMessage.isNotEmpty()) {
+private fun CPointer<PGconn>?.error(finish: Boolean): String {
+    val errorMessage = PQerrorMessage(this)?.toKString()
+    if (errorMessage?.isNotEmpty() == true) {
         pgDbLogD("error = $errorMessage")
     }
-    PQfinish(this)
-    return errorMessage
+    if (finish) {
+        this?.let {
+            PQfinish(it)
+        }
+    }
+
+    return errorMessage ?: ""
 }
 
 internal fun CPointer<PGresult>?.clear() {
