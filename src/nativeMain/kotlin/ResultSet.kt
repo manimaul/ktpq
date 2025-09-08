@@ -5,106 +5,168 @@ import kotlinx.cinterop.get
 import kotlinx.cinterop.toKString
 import libpq.PGconn
 import libpq.PGresult
+import libpq.PQclear
+import libpq.PQcmdTuples
 import libpq.PQexec
+import libpq.PQfname
+import libpq.PQfnumber
 import libpq.PQgetisnull
 import libpq.PQgetlength
 import libpq.PQgetvalue
+import libpq.PQnfields
 import libpq.PQntuples
 
 interface ResultSet : AutoCloseable {
-    fun next() : Boolean
-    fun getString(index: Int) : String
-    fun getBoolean(index: Int) : Boolean
-    fun getByte(index: Int) : Byte
-    fun getBytes(index: Int) : ByteArray
-    fun getShort(index: Int) : Short
-    fun getInt(index: Int) : Int
-    fun getLong(index: Int) : Long
-    fun getFloat(index: Int) : Float
-    fun getDouble(index: Int) : Double
-}
 
-class EmptyResultSet : ResultSet {
-    override fun next(): Boolean {
-        return false
-    }
+    val numberOfFields: Int
+    val keys: List<String>
+    val rows: Long
+    fun next(): Boolean
 
-    override fun getString(index: Int): String {
-        throw IllegalStateException("empty result set")
-    }
+    fun getString(index: Int): String
+    fun getString(key: String): String
 
-    override fun getBoolean(index: Int): Boolean {
-        throw IllegalStateException("empty result set")
-    }
+    fun getBoolean(index: Int): Boolean
+    fun getBoolean(key: String): Boolean
 
-    override fun getByte(index: Int): Byte {
-        throw IllegalStateException("empty result set")
-    }
+    fun getByte(index: Int): Byte
+    fun getByte(key: String): Byte
 
-    override fun getBytes(index: Int): ByteArray {
-        throw IllegalStateException("empty result set")
-    }
+    fun getBytes(index: Int): ByteArray
+    fun getBytes(key: String): ByteArray
 
-    override fun getShort(index: Int): Short {
-        throw IllegalStateException("empty result set")
-    }
+    fun getShort(index: Int): Short
+    fun getShort(key: String): Short
 
-    override fun getInt(index: Int): Int {
-        throw IllegalStateException("empty result set")
-    }
+    fun getInt(index: Int): Int
+    fun getInt(key: String): Int
 
-    override fun getLong(index: Int): Long {
-        throw IllegalStateException("empty result set")
-    }
+    fun getLong(index: Int): Long
+    fun getLong(key: String): Long
 
-    override fun getFloat(index: Int): Float {
-        throw IllegalStateException("empty result set")
-    }
-
-    override fun getDouble(index: Int): Double {
-        throw IllegalStateException("empty result set")
-    }
-
-    override fun close() { }
+    fun getFloat(index: Int): Float
+    fun getFloat(key: String): Float
+    fun getDouble(index: Int): Double
+    fun getDouble(key: String): Double
 }
 
 @ExperimentalForeignApi
 class PgResultSet(
-    private val cursorName: String,
-    private var result: CPointer<PGresult>,
+    private val cursorName: String? = null,
+    private var result: CPointer<PGresult>?,
     private val conn: CPointer<PGconn>,
 ) : ResultSet {
-    private var currentRowIndex = -1
-    private var maxRowIndex = -1
+    private var currentRowIndex: Int = -1
+    private var maxRowIndex: Int = -1
 
-    override fun next(): Boolean {
+    override val numberOfFields: Int
+        get() = PQnfields(result)
+
+    override val keys: List<String> by lazy {
+        val n = PQnfields(result)
+        val arr = arrayOfNulls<String>(n)
+        for (i in 0 until PQnfields(result)) {
+            arr[i] = PQfname(result, i)?.toKString()
+        }
+        arr.filterNotNull()
+    }
+
+    override val rows: Long by lazy {
+        cursorName?.let {
+            result?.let { ptr ->
+                val rowCount = PQcmdTuples(ptr)?.toKString()?.toLongOrNull()
+                PQclear(ptr)
+                result = null
+                rowCount
+            } ?: 0
+        } ?: PQntuples(result).toLong()
+    }
+
+    private fun nextWithCursor(): Boolean {
         if (currentRowIndex == maxRowIndex) {
             currentRowIndex = -1
         }
         if (currentRowIndex == -1) {
-            result = PQexec(conn, "FETCH ALL IN $cursorName").check(conn)
+            clearResult()
+            result = PQexec(conn, "FETCH FORWARD 100 FROM $cursorName").check(conn)
             maxRowIndex = PQntuples(result) - 1
         }
         return if (currentRowIndex < maxRowIndex) {
             currentRowIndex += 1
-           true
+            true
         } else {
             false
         }
     }
 
+    override fun next(): Boolean {
+        return cursorName?.let {
+            nextWithCursor()
+        } ?: run {
+            if (currentRowIndex == -1) {
+                maxRowIndex = PQntuples(result) - 1
+            }
+            return if (currentRowIndex < maxRowIndex) {
+                currentRowIndex += 1
+                true
+            } else {
+                false
+            }
+        }
+    }
+
     override fun getString(index: Int): String {
-        val isNull = PQgetisnull(result, tup_num = currentRowIndex, field_num = index) == 1
-        return if (isNull) {
-           null
+        if (index < numberOfFields) {
+            val isNull = PQgetisnull(result, tup_num = currentRowIndex, field_num = index) == 1
+            return if (isNull) {
+                null
+            } else {
+                val value = PQgetvalue(result, tup_num = currentRowIndex, field_num = index)
+                value?.toKString()
+            } ?: ""
         } else {
-            val value = PQgetvalue(result, tup_num = currentRowIndex, field_num = index)
-            value?.toKString()
-        } ?: ""
+            return ""
+        }
     }
 
     override fun getBoolean(index: Int): Boolean {
         return getString(index).toBoolean()
+    }
+
+    override fun getString(key: String): String {
+        return getString(PQfnumber(result, key))
+    }
+
+    override fun getBoolean(key: String): Boolean {
+        return getBoolean(PQfnumber(result, key))
+    }
+
+    override fun getByte(key: String): Byte {
+        return getByte(PQfnumber(result, key))
+    }
+
+    override fun getBytes(key: String): ByteArray {
+        return getBytes(PQfnumber(result, key))
+    }
+
+    override fun getShort(key: String): Short {
+        return getShort(PQfnumber(result, key))
+    }
+
+    override fun getInt(key: String): Int {
+        return getInt(PQfnumber(result, key))
+    }
+
+    override fun getLong(key: String): Long {
+        return getLong(PQfnumber(result, key))
+    }
+
+    override fun getFloat(key: String): Float {
+        return getFloat(PQfnumber(result, key))
+    }
+
+    override fun getDouble(key: String): Double {
+        return getDouble(PQfnumber(result, key))
     }
 
     override fun getByte(index: Int): Byte {
@@ -116,6 +178,7 @@ class PgResultSet(
     } else {
         this - 87
     }
+
     private fun CPointer<ByteVar>.fromHex(length: Int): ByteArray {
         val array = ByteArray((length - 2) / 2)
         var index = 0
@@ -130,14 +193,18 @@ class PgResultSet(
     }
 
     override fun getBytes(index: Int): ByteArray {
-        val isNull = PQgetisnull(result, tup_num = currentRowIndex, field_num = index) == 1
-        return if (isNull) {
-            null
+        if (index < numberOfFields) {
+            val isNull = PQgetisnull(result, tup_num = currentRowIndex, field_num = index) == 1
+            return if (isNull) {
+                null
+            } else {
+                val bytes = PQgetvalue(result, tup_num = currentRowIndex, field_num = index)!!
+                val length = PQgetlength(result, tup_num = currentRowIndex, field_num = index)
+                bytes.fromHex(length)
+            } ?: ByteArray(0)
         } else {
-            val bytes = PQgetvalue(result, tup_num = currentRowIndex, field_num = index)!!
-            val length = PQgetlength(result, tup_num = currentRowIndex, field_num = index)
-            bytes.fromHex(length)
-        } ?: ByteArray(0)
+            return ByteArray(0)
+        }
     }
 
     override fun getShort(index: Int): Short {
@@ -160,11 +227,19 @@ class PgResultSet(
         return getString(index).toDouble()
     }
 
+    fun clearResult() {
+        result?.clear()
+        result = null
+    }
+
     override fun close() {
-        result.clear()
-        pgDbLogD("closing cursor '$cursorName' and ending transaction")
-        conn.exec("CLOSE $cursorName")
-        conn.exec("END")
+        pgDbLogD("clearing result")
+        clearResult()
+        if (cursorName != null) {
+            pgDbLogD("closing cursor '$cursorName' and ending transaction")
+            conn.exec("CLOSE $cursorName")
+            conn.exec("END")
+        }
     }
 
 }

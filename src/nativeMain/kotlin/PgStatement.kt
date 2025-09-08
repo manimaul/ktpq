@@ -1,8 +1,10 @@
 @file:OptIn(ExperimentalForeignApi::class)
 
+import kotlinx.cinterop.CPointer
 import kotlinx.cinterop.ExperimentalForeignApi
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.refTo
+import libpq.PGresult
 import libpq.PQexec
 import libpq.PQexecParams
 
@@ -17,6 +19,9 @@ open class PgStatement(
         pgDbLogD("starting transaction")
         pgDb.conn.exec("BEGIN")
         val cursor = generateRandomString(8)
+        if (pgDebug) {
+            println("executing query $sql with parameters $parameters")
+        }
         return if (parameters > 0) {
             val result = memScoped {
                 PQexecParams(
@@ -42,8 +47,7 @@ open class PgStatement(
         }
     }
 
-
-    override fun execute(): Long {
+    private fun executeInternal(): CPointer<PGresult>  {
         if (parameters > 0) {
             return memScoped {
                 PQexecParams(
@@ -56,19 +60,22 @@ open class PgStatement(
                     paramTypes = types.refTo(0),
                     resultFormat = TEXT_RESULT_FORMAT
                 )
-            }.check(pgDb.conn).rows
+            }.check(pgDb.conn)
         }
         return memScoped {
             PQexec(
                 pgDb.conn,
                 query = sql,
             )
-        }.check(pgDb.conn).rows
+        }.check(pgDb.conn)
     }
 
+    override fun executeReturning(): ResultSet {
+        return PgResultSet(result = executeInternal(), conn = pgDb.conn)
+    }
 
-    override fun <T> executeUpdate(handler: (Int, ResultSet) -> T): T {
-        TODO("Not yet implemented")
+    override fun execute(): Long {
+        return executeInternal().rows
     }
 
 

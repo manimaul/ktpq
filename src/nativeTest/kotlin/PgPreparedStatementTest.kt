@@ -4,6 +4,7 @@ import kotlin.test.BeforeTest
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFails
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 
@@ -146,5 +147,23 @@ class PgPreparedStatementTest {
                 "baz",
             ), names
         )
+    }
+
+    @Test
+    fun testUpdate() {
+        runBlocking {
+            ds.connection().use { conn ->
+                val result  = conn.statement("insert into testing VALUES (1, 'bar'), (2, 'baz') returning *;").executeReturning()
+                assertEquals(2, result.rows)
+
+                assertTrue(result.next())
+                assertEquals("bar", result.getString("name"))
+
+                assertTrue(result.next())
+//                assertEquals("bar", result.getString(1))
+
+                assertFalse(result.next())
+            }
+        }
     }
 }

@@ -100,6 +100,10 @@ class PgConnection(
         return PgPreparedStatement(sql, pgDb, sql.hashCode())
     }
 
+    override fun prepareStatement(sql: String, identifier: Int): Statement {
+        return PgPreparedStatement(sql, pgDb, identifier)
+    }
+
     override fun createArrayOf(type: String, items: Array<String>): Array<String> {
         TODO("Not yet implemented")
     }

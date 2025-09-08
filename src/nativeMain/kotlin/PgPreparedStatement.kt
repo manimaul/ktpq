@@ -14,8 +14,8 @@ class PgPreparedStatement(
 
     private fun Int.escapeNegative(): String = if (this < 0) "_${toString().substring(1)}" else toString()
 
+    private val cursorName = "cursor${identifier.escapeNegative()}"
     override fun executeQuery(): ResultSet {
-        val cursorName = "cursor${identifier.escapeNegative()}"
         if (!preparedStatementExists()) {
             pgDbLogD("preparing statement for '$sql'")
             prepare(cursorName)
@@ -56,48 +56,11 @@ class PgPreparedStatement(
         }
     }
 
-    override fun execute(): Long {
-//        return onExec(this)
-//        if (identifier == null) {
-//            if (parameters == 0) {
-//                return memScoped {
-//                    PQexec(
-//                        conn =connection.pgDb.conn,
-//                        query = sql
-//                    ).check(connection.pgDb.conn)
-//                }.rows
-//            }
-//        }
-//        return if (identifier == null) {
-//            memScoped {
-//                PQexecParams(
-//                    connection.pgDb.conn,
-//                    nParams = parameters,
-//                    paramValues = values(this),
-//                    paramFormats = formats.refTo(0),
-//                    paramLengths = lengths.refTo(0),
-//                    resultFormat = TEXT_RESULT_FORMAT,
-//                   paramTypes = prp
-//                )
-//            }.check(connection.pgDb.conn).rows
-//        } else {
-//            //todo: check for cached statement
-//            memScoped {
-//                PQexecPrepared(
-//                    connection.pgDb.conn,
-//                    stmtName = identifier.toString(),
-//                    nParams = parameters,
-//                    paramValues = values(this),
-//                    paramFormats = formats.refTo(0),
-//                    paramLengths = lengths.refTo(0),
-//                    resultFormat = TEXT_RESULT_FORMAT
-//                )
-//            }.check(connection.pgDb.conn).rows
-//        }
-        TODO()
+    override fun executeReturning(): ResultSet {
+        return executeQuery()
     }
 
-    override fun <T> executeUpdate(handler: (Int, ResultSet) -> T): T {
-        TODO("Not yet implemented")
+    override fun execute(): Long {
+        return executeQuery().rows
     }
 }

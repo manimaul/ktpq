@@ -108,6 +108,7 @@ private fun CPointer<PGconn>?.error(finish: Boolean): String {
 }
 
 internal fun CPointer<PGresult>?.clear() {
+    pgDbLogD("clearing result $this")
     PQclear(this)
 }
 
@@ -116,11 +117,3 @@ internal fun CPointer<PGconn>.exec(sql: String) {
     result.check(this)
     result.clear()
 }
-
-private fun CPointer<PGconn>.escaped(value: String): String {
-    val cString = PQescapeIdentifier(this, value, value.length.convert())
-    val escaped = cString!!.toKString()
-    PQfreemem(cString)
-    return escaped
-}
-

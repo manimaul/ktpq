@@ -2,8 +2,7 @@ interface Statement {
 
     fun executeQuery() : ResultSet
     fun execute() : Long
-    fun <T> executeUpdate(handler: (Int, ResultSet) -> T) : T
-
+    fun executeReturning(): ResultSet
     fun setArray(index: Int, value: Array<String>?) : Statement
     fun setLong(index: Int, value: Long?) :Statement
     fun setBool(index: Int, value: Boolean?) : Statement
@@ -21,6 +20,11 @@ interface Connection : AutoCloseable {
     ) : Statement
     fun prepareStatement(
         sql: String
+    ) : Statement
+
+    fun prepareStatement(
+        sql: String,
+        identifier: Int,
     ) : Statement
     fun createArrayOf(type: String, items: Array<String>) : Array<String>
 }
