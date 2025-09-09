@@ -1,4 +1,6 @@
 import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.Json.Default.decodeFromString
+import kotlinx.serialization.json.Json.Default.encodeToString
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test
@@ -176,18 +178,13 @@ class PgPreparedStatementTest {
         runBlocking {
             ds.connection().use { conn ->
                 println("creating statement")
+
                 val statement =
-                    conn.statement("insert into testing VALUES ($1, $2, $3, $4), ($5, $6, $7, $8) returning *;")
+                    conn.statement("insert into testing (id, name) VALUES ($1, $2), ($3, $4) returning *;")
                         .setLong(1, 1)
                         .setString(2, "bar")
-//                        .setJsonb(3, "{}")
-                        .setArray(4, arrayOf("a", "b", "c"))
-
-                        .setLong(5, 2)
-                        .setString(6, "baz")
-//                        .setJsonb(7, "{}")
-                        .setArray(8, arrayOf("d", "e", "f"))
-                println("executing")
+                        .setLong(3, 2)
+                        .setString(4, "baz")
                 val result = statement.executeReturning()
                 assertEquals(2, result.rows)
 
@@ -200,6 +197,123 @@ class PgPreparedStatementTest {
                 assertEquals("baz", result.getString(1))
 
                 assertFalse(result.next())
+            }
+        }
+    }
+
+
+    @Test
+    fun testJsonQuery() {
+        runBlocking {
+            ds.connection().use { conn ->
+                println("creating statement")
+                var i = 0
+                println("json = ${encodeToString(KvString(key = "value"))}")
+                conn.statement("insert into testing (id, name, json_b) VALUES ($1, $2, $3), ($4, $5, $6);")
+                    .setLong(++i, 1)
+                    .setString(++i, "bar")
+                    .setJsonb(++i, encodeToString(KvString(key = "value")))
+                    .setLong(++i, 2)
+                    .setString(++i, "baz")
+                    .setJsonb(++i, encodeToString(KvDouble(key = 0.3)))
+                    .execute()
+
+                conn.statement("select * from testing where json_b->>'key'='value';")
+                    .executeQuery().use { result ->
+                        assertEquals(1, result.rows, "1st query number of rows")
+                        assertTrue(result.next(), "1st query has next")
+                        assertEquals("bar", result.getString("name"))
+                        assertEquals(1L, result.getLong("id"))
+                        assertEquals(
+                            expected = KvString(key = "value"),
+                            actual = decodeFromString(result.getString("json_b"))
+                        )
+                        assertFalse(result.next(), "1st query no next")
+                    }
+                conn.statement("select * from testing where json_b->>'key'='0.3';")
+                    .executeQuery().use { result ->
+                        assertTrue(result.next(), "2nd query has next")
+                        assertEquals(1, result.rows, "2nd query number of rows")
+                        assertEquals("baz", result.getString("name"))
+                        assertEquals(2L, result.getLong("id"))
+
+                        assertEquals(
+                            expected = KvDouble(key = 0.3),
+                            actual = decodeFromString(result.getString("json_b"))
+                        )
+
+                        assertFalse(result.next(), "2nd query no next")
+                    }
+            }
+        }
+    }
+
+    @Test
+    fun testArrayQuery() {
+        runBlocking {
+            ds.connection().use { conn ->
+                println("creating statement")
+                var i = 0
+                conn.statement("insert into testing (id, name, array_t) VALUES ($1, $2, $3), ($4, $5, $6);")
+                    .setLong(++i, 1)
+                    .setString(++i, "bar")
+                    .setArray(++i, arrayOf("a", "b", "c"))
+
+                    .setLong(++i, 2)
+                    .setString(++i, "baz")
+                    .setArray(++i, arrayOf("d", "e", "f")).execute()
+
+                conn.statement("select * from testing where json_b->>'key'='value';")
+                    .executeQuery().use { result ->
+                        assertTrue(result.next())
+                        assertEquals(1, result.rows)
+                        println(result.keys)
+                        assertEquals("bar", result.getString("name"))
+                        assertEquals(1L, result.getLong("id"))
+                        assertEquals(arrayOf("a", "b", "c").toList(), result.getArray("array_t").toList())
+                        assertFalse(result.next())
+                    }
+                conn.statement("select * from testing where json_b->>'key'='0.3';")
+                    .executeQuery().use { result ->
+                        assertTrue(result.next())
+                        assertEquals(1, result.rows)
+                        println(result.keys)
+                        assertEquals("baz", result.getString("name"))
+                        assertEquals(2L, result.getLong("id"))
+                        assertEquals(arrayOf("d", "e", "f").toList(), result.getArray("array_t").toList())
+                        assertFalse(result.next())
+                    }
+            }
+        }
+    }
+
+    @Test
+    fun testUnNestArrayQuery() {
+        runBlocking {
+            ds.connection().use { conn ->
+                println("creating statement")
+                var i = 0
+                conn.statement("insert into testing VALUES ($1, $2, null, $3), ($4, $5, null, $6);")
+                    .setLong(++i, 1)
+                    .setString(++i, "bar")
+                    .setArray(++i, arrayOf("a", "b", "c"))
+
+                    .setLong(++i, 2)
+                    .setString(++i, "baz")
+                    .setArray(++i, arrayOf("d", "e", "f")).execute()
+
+                conn.statement("select unnest(array_t) as element from testing where name='bar';")
+                    .executeQuery().use { result ->
+                        assertEquals(3, result.rows)
+                        assertTrue(result.next())
+                        assertEquals("a", result.getString("element"))
+                        assertTrue(result.next())
+                        assertEquals("b", result.getString("element"))
+                        assertTrue(result.next())
+                        assertEquals("c", result.getString("element"))
+                        println(result.keys)
+                        assertFalse(result.next())
+                    }
             }
         }
     }

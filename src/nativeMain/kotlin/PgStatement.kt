@@ -85,6 +85,9 @@ open class PgStatement(
     internal val types = UIntArray(parameters)
 
     private fun bind(index: Int, value: String?, oid: UInt) {
+        if (index !in 1..parameters) {
+            throw IllegalArgumentException("1 based index $index is out of bounds for $parameters parameters")
+        }
         val zeroIndex = index - 1
         lengths[zeroIndex] = if (value != null) {
             values[zeroIndex] = Data.Text(value)
@@ -110,8 +113,7 @@ open class PgStatement(
         }
         sb.append('}')
         val arrStr = sb.toString()
-        println("array arg string = $arrStr")
-        bind(index, arrStr, anyArrayOid)
+        bind(index, arrStr, autoOid)
         return this
     }
 
@@ -146,7 +148,7 @@ open class PgStatement(
     }
 
     override fun setJsonb(index: Int, json: String?): Statement {
-        bind(index, json, jsonbOid)
+        bind(index, json, autoOid)
         return this
     }
 
@@ -180,10 +182,9 @@ open class PgStatement(
         INTEGER[]
         TEXT[][]
          */
-        private const val anyArrayOid = 0u //2277u
+        private const val autoOid = 0u //2277u
         private const val floatOid = 700u
         private const val doubleOid = 701u
-        private const val jsonbOid = 3082u
         private val pattern = "\\$[1-9]".toRegex()
     }
 }

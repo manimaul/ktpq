@@ -13,7 +13,7 @@ const val testDbSql = """
     (
         id      BIGSERIAL PRIMARY KEY, 
         name    VARCHAR   UNIQUE NOT NULL,
-        json_d  JSONB     NULL,
+        json_b  JSONB     NULL,
         array_t VARCHAR[] NULL
     );
 """
@@ -149,7 +149,9 @@ class PgStatementTest {
                 val select = conn.statement("select * from testing;")
                 println("executing select staement")
                 select.executeQuery().use { resultSet ->
+                    assertEquals(250, resultSet.rows)
                     while (resultSet.next()) {
+                        assertEquals(250, resultSet.rows)
                         val id = resultSet.getLong(0)
                         val name = resultSet.getString(1)
                         println("result record id: $id value = $name")

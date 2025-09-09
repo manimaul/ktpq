@@ -82,7 +82,7 @@ class RawQueries {
 
             res.clear()
 
-            assertEquals(listOf("id", "name", "json_d", "array_t"), keys)
+            assertEquals(listOf("id", "name", "json_b", "array_t"), keys)
             assertEquals(4, numberOfFields)
             assertEquals(listOf("2,baz"), results)
         }
