@@ -21,7 +21,7 @@ class PgPreparedStatementTest {
             ds.connection().use { conn ->
                 conn.statement("drop table if exists testing;")
                     .execute()
-                conn.statement("create table if not exists testing (id bigserial primary key, name varchar unique not null);")
+                conn.statement(testDbSql)
                     .execute()
             }
         }
@@ -153,14 +153,51 @@ class PgPreparedStatementTest {
     fun testUpdate() {
         runBlocking {
             ds.connection().use { conn ->
-                val result  = conn.statement("insert into testing VALUES (1, 'bar'), (2, 'baz') returning *;").executeReturning()
+                val result =
+                    conn.statement("insert into testing VALUES (1, 'bar'), (2, 'baz') returning *;")
+                        .executeReturning()
                 assertEquals(2, result.rows)
 
                 assertTrue(result.next())
+                assertEquals(1L, result.getLong("id"))
                 assertEquals("bar", result.getString("name"))
 
                 assertTrue(result.next())
-//                assertEquals("bar", result.getString(1))
+                assertEquals(2L, result.getLong(0))
+                assertEquals("baz", result.getString(1))
+
+                assertFalse(result.next())
+            }
+        }
+    }
+
+    @Test
+    fun testUpdateParams() {
+        runBlocking {
+            ds.connection().use { conn ->
+                println("creating statement")
+                val statement =
+                    conn.statement("insert into testing VALUES ($1, $2, $3, $4), ($5, $6, $7, $8) returning *;")
+                        .setLong(1, 1)
+                        .setString(2, "bar")
+//                        .setJsonb(3, "{}")
+                        .setArray(4, arrayOf("a", "b", "c"))
+
+                        .setLong(5, 2)
+                        .setString(6, "baz")
+//                        .setJsonb(7, "{}")
+                        .setArray(8, arrayOf("d", "e", "f"))
+                println("executing")
+                val result = statement.executeReturning()
+                assertEquals(2, result.rows)
+
+                assertTrue(result.next())
+                assertEquals(1L, result.getLong("id"))
+                assertEquals("bar", result.getString("name"))
+
+                assertTrue(result.next())
+                assertEquals(2L, result.getLong(0))
+                assertEquals("baz", result.getString(1))
 
                 assertFalse(result.next())
             }

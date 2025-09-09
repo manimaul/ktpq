@@ -1,9 +1,5 @@
 import kotlinx.cinterop.ExperimentalForeignApi
-import kotlinx.cinterop.memScoped
-import kotlinx.cinterop.refTo
 import kotlinx.coroutines.runBlocking
-import libpq.PQexec
-import libpq.PQexecParams
 import kotlin.test.AfterTest
 import kotlin.test.BeforeTest
 import kotlin.test.Test

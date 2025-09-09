@@ -3,7 +3,7 @@ interface Statement {
     fun executeQuery() : ResultSet
     fun execute() : Long
     fun executeReturning(): ResultSet
-    fun setArray(index: Int, value: Array<String>?) : Statement
+    fun setArray(index: Int, value: Array<Any>?) : Statement
     fun setLong(index: Int, value: Long?) :Statement
     fun setBool(index: Int, value: Boolean?) : Statement
     fun setInt(index: Int, value: Int?) : Statement

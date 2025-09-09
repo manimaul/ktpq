@@ -47,7 +47,7 @@ open class PgStatement(
         }
     }
 
-    private fun executeInternal(): CPointer<PGresult>  {
+    private fun executeInternal(): CPointer<PGresult> {
         if (parameters > 0) {
             return memScoped {
                 PQexecParams(
@@ -94,8 +94,24 @@ open class PgStatement(
         types[zeroIndex] = oid
     }
 
-    override fun setArray(index: Int, value: Array<String>?): Statement {
-        TODO("Not yet implemented")
+    override fun setArray(index: Int, value: Array<Any>?): Statement {
+        val sb = StringBuilder("{")
+        value?.forEachIndexed { i, ea ->
+            if (ea is Number) {
+                sb.append(ea.toString())
+            } else {
+                sb.append('\"')
+                sb.append(ea.toString())
+                sb.append('\"')
+            }
+            if (i < value.size - 1) {
+                sb.append(',')
+            }
+        }
+        sb.append('}')
+        val arrStr = sb.toString()
+        println("array arg string = $arrStr")
+        bind(index, arrStr, anyArrayOid)
         return this
     }
 
@@ -145,14 +161,26 @@ open class PgStatement(
     }
 
     companion object {
-        // select * from pg_type;
+        // select * from pg_type where typname like '%array';
         // select 'features'::regclass::oid;
         private const val boolOid = 16u
         private const val byteaOid = 17u
         private const val longOid = 20u
         private const val intOid = 23u
         private const val textOid = 25u
-        private const val textArrayOid = 19654u
+
+        /*
+        INTEGER[],
+        TEXT[],
+        VARCHAR[],
+        BOOLEAN[],
+        NUMERIC[],
+        DATE[],
+        TIMESTAMP[],
+        INTEGER[]
+        TEXT[][]
+         */
+        private const val anyArrayOid = 0u //2277u
         private const val floatOid = 700u
         private const val doubleOid = 701u
         private const val jsonbOid = 3082u
