@@ -100,12 +100,20 @@ open class PgStatement(
     override fun setArray(index: Int, value: Array<Any>?): Statement {
         val sb = StringBuilder("{")
         value?.forEachIndexed { i, ea ->
-            if (ea is Number) {
-                sb.append(ea.toString())
-            } else {
-                sb.append('\"')
-                sb.append(ea.toString())
-                sb.append('\"')
+            when (ea) {
+                is Number -> {
+                    sb.append(ea.toString())
+                }
+                is String -> {
+                    sb.append('\"')
+                    sb.append(ea)
+                    sb.append('\"')
+                }
+                else -> {
+                    sb.append('\"')
+                    sb.append(ea.toString())
+                    sb.append('\"')
+                }
             }
             if (i < value.size - 1) {
                 sb.append(',')
@@ -147,18 +155,28 @@ open class PgStatement(
         return this
     }
 
-    override fun setJsonb(index: Int, json: String?): Statement {
+    override fun setAuto(index: Int, json: String?): Statement {
         bind(index, json, autoOid)
         return this
     }
 
+    override fun setAuto(index: Int, value: ByteArray?): Statement {
+        setBytes(index, value, autoOid)
+        return this
+    }
+
     override fun setBytes(index: Int, value: ByteArray?): Statement {
+        setBytes(index, value, byteaOid)
+        return this
+    }
+
+    fun setBytes(index: Int, value: ByteArray?, oid: UInt): Statement {
         lengths[index] = if (value != null && value.isNotEmpty()) {
             values[index] = Data.Bytes(value)
             value.size
         } else 0
         formats[index] = BINARY_RESULT_FORMAT
-        types[index] = byteaOid
+        types[index] = oid
         return this
     }
 

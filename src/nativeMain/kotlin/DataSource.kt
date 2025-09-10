@@ -10,7 +10,8 @@ interface Statement {
     fun setFloat(index: Int, value: Float?) : Statement
     fun setDouble(index: Int, value: Double?) : Statement
     fun setString(index: Int, value: String?) : Statement
-    fun setJsonb(index: Int, json: String?) : Statement
+    fun setAuto(index: Int, json: String?) : Statement
+    fun setAuto(index: Int, value: ByteArray?) : Statement
     fun setBytes(index: Int, value: ByteArray?) : Statement
 }
 
@@ -26,7 +27,6 @@ interface Connection : AutoCloseable {
         sql: String,
         identifier: Int,
     ) : Statement
-    fun createArrayOf(type: String, items: Array<String>) : Array<String>
 }
 
 interface DataSource {

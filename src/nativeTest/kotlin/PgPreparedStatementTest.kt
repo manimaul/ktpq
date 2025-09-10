@@ -212,10 +212,10 @@ class PgPreparedStatementTest {
                 conn.statement("insert into testing (id, name, json_b) VALUES ($1, $2, $3), ($4, $5, $6);")
                     .setLong(++i, 1)
                     .setString(++i, "bar")
-                    .setJsonb(++i, encodeToString(KvString(key = "value")))
+                    .setAuto(++i, encodeToString(KvString(key = "value")))
                     .setLong(++i, 2)
                     .setString(++i, "baz")
-                    .setJsonb(++i, encodeToString(KvDouble(key = 0.3)))
+                    .setAuto(++i, encodeToString(KvDouble(key = 0.3)))
                     .execute()
 
                 conn.statement("select * from testing where json_b->>'key'='value';")

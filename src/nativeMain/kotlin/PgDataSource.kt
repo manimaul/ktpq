@@ -104,10 +104,6 @@ class PgConnection(
         return PgPreparedStatement(sql, pgDb, identifier)
     }
 
-    override fun createArrayOf(type: String, items: Array<String>): Array<String> {
-        TODO("Not yet implemented")
-    }
-
     override fun close() {
         onClose()
     }
