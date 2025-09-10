@@ -34,9 +34,7 @@ open class PgStatement(
             PgResultSet(cursor, result, pgDb.conn)
         } else {
             pgDb.conn.exec("DECLARE $cursor CURSOR FOR $sql")
-            val result = memScoped {
-                PQexec(pgDb.conn, sql).check(pgDb.conn)
-            }.check(pgDb.conn)
+            val result = PQexec(pgDb.conn, sql).check(pgDb.conn)
             return PgResultSet(cursor, result, pgDb.conn)
         }
     }
@@ -56,12 +54,11 @@ open class PgStatement(
                 )
             }.check(pgDb.conn)
         }
-        return memScoped {
-            PQexec(
-                pgDb.conn,
-                query = sql,
-            )
-        }.check(pgDb.conn)
+
+        return PQexec(
+            pgDb.conn,
+            query = sql,
+        ).check(pgDb.conn)
     }
 
     override fun executeReturning(): ResultSet {
@@ -78,19 +75,6 @@ open class PgStatement(
     internal val formats = IntArray(parameters)
     internal val types = UIntArray(parameters)
 
-    private fun bind(index: Int, value: String?, oid: UInt) {
-        if (index !in 1..parameters) {
-            throw IllegalArgumentException("1 based index $index is out of bounds for $parameters parameters")
-        }
-        val zeroIndex = index - 1
-        lengths[zeroIndex] = if (value != null) {
-            values[zeroIndex] = Data.Text(value)
-            value.length
-        } else 0
-        formats[zeroIndex] = TEXT_RESULT_FORMAT
-        types[zeroIndex] = oid
-    }
-
     override fun setArray(index: Int, value: Array<Any>?): Statement {
         val sb = StringBuilder("{")
         value?.forEachIndexed { i, ea ->
@@ -98,11 +82,13 @@ open class PgStatement(
                 is Number -> {
                     sb.append(ea.toString())
                 }
+
                 is String -> {
                     sb.append('\"')
                     sb.append(ea)
                     sb.append('\"')
                 }
+
                 else -> {
                     sb.append('\"')
                     sb.append(ea.toString())
@@ -155,22 +141,39 @@ open class PgStatement(
     }
 
     override fun setAuto(index: Int, value: ByteArray?): Statement {
-        setBytes(index, value, autoOid)
+        bind(index, value, autoOid)
         return this
     }
 
     override fun setBytes(index: Int, value: ByteArray?): Statement {
-        setBytes(index, value, byteaOid)
+        bind(index, value, byteaOid)
         return this
     }
 
-    fun setBytes(index: Int, value: ByteArray?, oid: UInt): Statement {
-        lengths[index] = if (value != null && value.isNotEmpty()) {
-            values[index] = Data.Bytes(value)
+    private fun bind(index: Int, value: String?, oid: UInt) {
+        if (index !in 1..parameters) {
+            throw IllegalArgumentException("1 based index $index is out of bounds for $parameters parameters")
+        }
+        val zeroIndex = index - 1
+        lengths[zeroIndex] = if (value != null) {
+            values[zeroIndex] = Data.Text(value)
+            value.length
+        } else 0
+        formats[zeroIndex] = TEXT_RESULT_FORMAT
+        types[zeroIndex] = oid
+    }
+
+    fun bind(index: Int, value: ByteArray?, oid: UInt): Statement {
+        if (index !in 1..parameters) {
+            throw IllegalArgumentException("1 based index $index is out of bounds for $parameters parameters")
+        }
+        val zeroIndex = index - 1
+        lengths[zeroIndex] = if (value != null && value.isNotEmpty()) {
+            values[zeroIndex] = Data.Bytes(value)
             value.size
         } else 0
-        formats[index] = BINARY_RESULT_FORMAT
-        types[index] = oid
+        formats[zeroIndex] = BINARY_RESULT_FORMAT
+        types[zeroIndex] = oid
         return this
     }
 

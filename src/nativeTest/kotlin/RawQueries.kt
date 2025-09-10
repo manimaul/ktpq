@@ -32,7 +32,6 @@ class RawQueries {
         runBlocking {
             ds.connection().use { conn ->
                 pgConn = (conn as PgConnection).pgDb.conn
-                conn.statement("drop table if exists testing;").execute()
                 conn.statement(testDbSql).execute()
             }
         }
@@ -47,29 +46,27 @@ class RawQueries {
     @Test
     fun testSelect() {
         PQexec(pgConn, "insert into testing VALUES (1, 'bar'), (2, 'baz');").check(pgConn)
-        memScoped {
-            val res = PQexec(
-                pgConn,
-                "select * from testing where name='baz';",
-            ).check(pgConn)
-            val maxRowIndex = PQntuples(res) - 1
-            var currentRowIndex: Int = -1
-            val numberOfFields: Int = PQnfields(res)
-            val results = mutableListOf<String>()
-            while (currentRowIndex < maxRowIndex) {
-                ++currentRowIndex
-                val id = PQfnumber(res, "id").takeIf {
-                    PQgetisnull(res, tup_num = currentRowIndex, field_num = it) != 1
-                }?.let {
-                    PQgetvalue(res, currentRowIndex, it)?.toKString()?.toLongOrNull()
-                }
-                val name = PQfnumber(res, "name").takeIf {
-                    PQgetisnull(res, tup_num = currentRowIndex, field_num = it) != 1
-                }?.let {
-                    PQgetvalue(res, currentRowIndex, it)?.toKString()
-                }
-                results.add("$id,$name")
+        val res = PQexec(
+            pgConn,
+            "select * from testing where name='baz';",
+        ).check(pgConn)
+        val maxRowIndex = PQntuples(res) - 1
+        var currentRowIndex: Int = -1
+        val numberOfFields: Int = PQnfields(res)
+        val results = mutableListOf<String>()
+        while (currentRowIndex < maxRowIndex) {
+            ++currentRowIndex
+            val id = PQfnumber(res, "id").takeIf {
+                PQgetisnull(res, tup_num = currentRowIndex, field_num = it) != 1
+            }?.let {
+                PQgetvalue(res, currentRowIndex, it)?.toKString()?.toLongOrNull()
             }
+            val name = PQfnumber(res, "name").takeIf {
+                PQgetisnull(res, tup_num = currentRowIndex, field_num = it) != 1
+            }?.let {
+                PQgetvalue(res, currentRowIndex, it)?.toKString()
+            }
+            results.add("$id,$name")
 
             val keys = arrayOfNulls<String>(numberOfFields).let {
                 for (i in 0 until numberOfFields) {
@@ -80,8 +77,8 @@ class RawQueries {
 
             res.clear()
 
-            assertEquals(listOf("id", "name", "json_b", "array_t"), keys)
-            assertEquals(4, numberOfFields)
+            assertEquals(listOf("id", "name", "json_b", "array_t", "data_b"), keys)
+            assertEquals(5, numberOfFields)
             assertEquals(listOf("2,baz"), results)
         }
     }
@@ -129,7 +126,7 @@ class RawQueries {
                 results.add("$id,$name")
             }
             res.clear()
-            assertEquals(4, numberOfFields)
+            assertEquals(5, numberOfFields)
             assertEquals(listOf("1,bar", "3,zab"), results)
         }
     }
@@ -192,7 +189,7 @@ class RawQueries {
             PQexec(pgConn, "CLOSE my_cursor").check(pgConn)
             PQexec(pgConn, "END").check(pgConn)
 
-            assertEquals(4, numberOfFields)
+            assertEquals(5, numberOfFields)
             assertEquals(listOf("1,bar", "3,zab"), results)
         }
     }

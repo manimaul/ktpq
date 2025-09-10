@@ -9,12 +9,14 @@ import kotlin.test.assertTrue
 
 
 const val testDbSql = """
-    create table if not exists testing 
+    drop table if exists testing;
+    create table testing 
     (
         id      BIGSERIAL PRIMARY KEY, 
         name    VARCHAR   UNIQUE NOT NULL,
         json_b  JSONB     NULL,
-        array_t VARCHAR[] NULL
+        array_t VARCHAR[] NULL,
+        data_b    BYTEA   NULL
     );
 """
 
@@ -28,7 +30,6 @@ class PgStatementTest {
         assertEquals(1, ds.readyCount)
         runBlocking {
             ds.connection().use { conn ->
-                conn.statement("drop table if exists testing;").execute()
                 conn.statement(testDbSql).execute()
             }
         }
@@ -75,7 +76,7 @@ class PgStatementTest {
                 ).execute()
                 conn.statement("SELECT name from testing LIMIT $1;").setInt(1, 2).executeQuery().use { result ->
                     val names = mutableListOf<String>()
-                    println("result rows ${result.rows}")
+                    println("result rows ${result.totalRows}")
                     while (result.next()) {
                         val name = result.getString(0)
                         names.add(name)
@@ -148,9 +149,9 @@ class PgStatementTest {
                 val select = conn.statement("select * from testing;")
                 println("executing select staement")
                 select.executeQuery().use { resultSet ->
-                    assertEquals(250, resultSet.rows)
+                    assertEquals(250, resultSet.totalRows)
                     while (resultSet.next()) {
-                        assertEquals(250, resultSet.rows)
+                        assertEquals(250, resultSet.totalRows)
                         val id = resultSet.getLong(0)
                         val name = resultSet.getString(1)
                         println("result record id: $id value = $name")
@@ -187,33 +188,34 @@ class PgStatementTest {
 
     @Test
     fun testUpdates() {
+        var bazId: Long? = null
+        var barId: Long? = null
         runBlocking {
             ds.connection().use { conn ->
                 println("===== inserting bar, baz")
-                val bazId =
-                    conn.statement("insert into testing VALUES (1, 'bar'), (2, 'baz') returning *;").executeReturning()
-                        .use { result ->
-                            assertEquals(2, result.rows)
+                conn.statement("insert into testing VALUES (1, 'bar'), (2, 'baz') returning *;").executeReturning()
+                    .use { result ->
+                        assertEquals(2, result.totalRows)
 
-                            assertTrue(result.next())
-                            println("${result.getLong("id")}, ${result.getString("name")}")
-                            assertEquals("bar", result.getString("name"))
+                        assertTrue(result.next())
+                        barId = result.getLong("id")
+                        println("${result.getLong("id")}, ${result.getString("name")}")
+                        assertEquals("bar", result.getString("name"))
 
-                            assertTrue(result.next())
-                            println("${result.getLong("id")}, ${result.getString("name")}")
-                            val id = result.getLong("id")
-                            assertEquals("baz", result.getString("name"))
+                        assertTrue(result.next())
+                        println("${result.getLong("id")}, ${result.getString("name")}")
+                        bazId = result.getLong("id")
+                        assertEquals("baz", result.getString("name"))
 
-                            assertFalse(result.next())
-                            id
-                        }
+                        assertFalse(result.next())
+                    }
 
                 println("===== updating bazId $bazId name to foo")
                 conn.statement("update testing set name=$1 where id=$2 returning *;")
                     .setString(1, "foo")
                     .setLong(2, bazId)
                     .executeReturning().use { result ->
-                        assertEquals(1, result.rows)
+                        assertEquals(1, result.totalRows)
                         assertTrue(result.next())
                         println("${result.getLong("id")}, ${result.getString("name")}")
                         assertEquals("foo", result.getString("name"))
@@ -224,13 +226,13 @@ class PgStatementTest {
                     .setString(1, "pil")
                     .setLong(2, bazId)
                     .executeReturning().let { result ->
-                        assertEquals(1, result.rows)
+                        assertEquals(1, result.totalRows)
                         assertTrue(result.next())
                         println("${result.getLong("id")}, ${result.getString("name")}")
                         assertEquals("pil", result.getString("name"))
                     }
 
-                println("===== querying bazId $bazId expecting name to be pil")
+                println("===== querying * expecting it to contain $bazId,pil")
                 conn.statement("select * from testing;").executeQuery().use { result ->
                     val list = mutableListOf<String>()
                     while (result.next()) {
@@ -242,13 +244,24 @@ class PgStatementTest {
                     assertTrue(list.contains("$bazId,pil"))
                     assertEquals(2, list.size)
                 }
-//                conn.statement("select id, name from testing where name=$1 ;")
-//                    .setString(1, "pil").executeQuery().use { result ->
-//                        assertEquals(1, result.rows)
-//                        assertTrue(result.next())
-//                        println("${result.getLong("id")}, ${result.getString("name")}")
-//                        assertEquals("pil", result.getString("name"))
-//                    }
+
+                println("===== querying bazId $bazId expecting name to be pil")
+                conn.statement("select * from testing where id=$1 or id=$2 order by id;")
+                    .setLong(1, bazId)
+                    .setLong(2, barId)
+                    .executeQuery().use { result ->
+                        assertTrue(result.next())
+                        assertEquals(2, result.cursorRows)
+                        assertEquals(1L, result.getLong("id"))
+                        assertEquals("bar", result.getString("name"))
+
+                        assertTrue(result.next())
+                        assertEquals(2, result.cursorRows)
+                        assertEquals(2L, result.getLong("id"))
+                        assertEquals("pil", result.getString("name"))
+
+                        assertFalse(result.next())
+                    }
             }
         }
     }
@@ -257,16 +270,25 @@ class PgStatementTest {
     fun testBinaryData() {
         runBlocking {
             ds.connection().use { conn ->
-//                val count = conn.statement("insert into testing VALUES (1, 'bar'), (2, 'baz');").execute()
-//                val stmt = conn.statement("insert into testing VALUES ($1, $2), ($3, $4);")
-//                assertEquals(4, (stmt as PgStatement).parameters)
-//
-//                stmt.setLong(1, 3L).setString(2, "rab").setLong(3, 4L).setString(4, "zab")
-//
-//                val countParms = stmt.execute()
-//
-//                assertEquals(2, count)
-//                assertEquals(2, countParms)
+                conn.statement("insert into testing (id, name, data_b) VALUES ($1, $2, $3), ($4, $5, $6) returning *;")
+                    .setLong(1, 0L)
+                    .setString(2, "foo")
+                    .setBytes(3, byteArrayOf(9, 1, 1))
+                    .setLong(4, 1L)
+                    .setString(5, "bar")
+                    .setBytes(6, byteArrayOf(3, 5, 7))
+                    .executeReturning().use {
+                        assertEquals(2, it.totalRows)
+                        it.next()
+                        assertEquals(0L, it.getLong("id"))
+                        assertEquals("foo", it.getString("name"))
+                        assertEquals(byteArrayOf(9, 1, 1).toList(), it.getBytes("data_b").toList())
+
+                        it.next()
+                        assertEquals(1L, it.getLong("id"))
+                        assertEquals("bar", it.getString("name"))
+                        assertEquals(byteArrayOf(3, 5, 7).toList(), it.getBytes("data_b").toList())
+                    }
             }
         }
     }

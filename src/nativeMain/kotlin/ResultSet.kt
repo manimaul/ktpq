@@ -19,7 +19,8 @@ interface ResultSet : AutoCloseable {
 
     val numberOfFields: Int
     val keys: List<String>
-    val rows: Long
+    val totalRows: Long
+    val cursorRows: Long
     fun next(): Boolean
 
     fun getArray(index: Int): Array<String?>
@@ -72,12 +73,15 @@ class PgResultSet(
         arr.filterNotNull()
     }
 
-    override val rows: Long =
-        if (cursorName != null) {
-            result?.let { PQcmdTuples(it)?.toKString()?.toLongOrNull() } ?: 0L
-        } else {
-            result?.let { PQntuples(it).toLong() } ?: 0L
-        }
+    override val totalRows: Long = cursorRows
+
+    override val cursorRows: Long
+        get() =
+            if (cursorName != null) {
+                result?.let { PQcmdTuples(it)?.toKString()?.toLongOrNull() } ?: 0L
+            } else {
+                result?.let { PQntuples(it).toLong() } ?: 0L
+            }
 
 
     private fun nextWithCursor(): Boolean {

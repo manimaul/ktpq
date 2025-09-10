@@ -58,6 +58,6 @@ class PgPreparedStatement(
     }
 
     override fun execute(): Long {
-        return executeQuery().rows
+        return executeQuery().totalRows
     }
 }

@@ -20,8 +20,6 @@ class PgPreparedStatementTest {
         assertEquals(1, ds.readyCount)
         runBlocking {
             ds.connection().use { conn ->
-                conn.statement("drop table if exists testing;")
-                    .execute()
                 conn.statement(testDbSql)
                     .execute()
             }
@@ -157,7 +155,7 @@ class PgPreparedStatementTest {
                 val result =
                     conn.statement("insert into testing VALUES (1, 'bar'), (2, 'baz') returning *;")
                         .executeReturning()
-                assertEquals(2, result.rows)
+                assertEquals(2, result.totalRows)
 
                 assertTrue(result.next())
                 assertEquals(1L, result.getLong("id"))
@@ -185,7 +183,7 @@ class PgPreparedStatementTest {
                         .setLong(3, 2)
                         .setString(4, "baz")
                 val result = statement.executeReturning()
-                assertEquals(2, result.rows)
+                assertEquals(2, result.totalRows)
 
                 assertTrue(result.next())
                 assertEquals(1L, result.getLong("id"))
@@ -219,7 +217,7 @@ class PgPreparedStatementTest {
 
                 conn.statement("select * from testing where json_b->>'key'='value';")
                     .executeQuery().use { result ->
-                        assertEquals(1, result.rows, "1st query number of rows")
+                        assertEquals(1, result.totalRows, "1st query number of rows")
                         assertTrue(result.next(), "1st query has next")
                         assertEquals("bar", result.getString("name"))
                         assertEquals(1L, result.getLong("id"))
@@ -232,7 +230,7 @@ class PgPreparedStatementTest {
                 conn.statement("select * from testing where json_b->>'key'='0.3';")
                     .executeQuery().use { result ->
                         assertTrue(result.next(), "2nd query has next")
-                        assertEquals(1, result.rows, "2nd query number of rows")
+                        assertEquals(1, result.totalRows, "2nd query number of rows")
                         assertEquals("baz", result.getString("name"))
                         assertEquals(2L, result.getLong("id"))
 
@@ -264,7 +262,7 @@ class PgPreparedStatementTest {
 
                 conn.statement("select * from testing where name='bar';")
                     .executeQuery().use { result ->
-                        assertEquals(1, result.rows, "1st query rows")
+                        assertEquals(1, result.totalRows, "1st query rows")
                         assertTrue(result.next(), "1st query next")
                         println(result.keys)
                         assertEquals("bar", result.getString("name"))
@@ -274,7 +272,7 @@ class PgPreparedStatementTest {
                     }
                 conn.statement("select * from testing where name='baz';")
                     .executeQuery().use { result ->
-                        assertEquals(1, result.rows, "2nd query rows")
+                        assertEquals(1, result.totalRows, "2nd query rows")
                         assertTrue(result.next(), "2nd query next")
                         println(result.keys)
                         assertEquals("baz", result.getString("name"))
@@ -303,7 +301,7 @@ class PgPreparedStatementTest {
 
                 conn.statement("select unnest(array_t) as element from testing where name='bar';")
                     .executeQuery().use { result ->
-                        assertEquals(3, result.rows)
+                        assertEquals(3, result.totalRows)
                         assertTrue(result.next())
                         assertEquals("a", result.getString("element"))
                         assertTrue(result.next())
