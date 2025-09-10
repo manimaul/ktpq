@@ -25,10 +25,8 @@ class RawQueries {
 
     lateinit var pgConn: CPointer<PGconn>
 
-
     @BeforeTest
     fun beforeEach() {
-        pgDebug = true
         val ds = PgDataSource("postgresql://admin:mysecretpassword@localhost:5432/s57server", 1)
         assertEquals(1, ds.readyCount)
         runBlocking {

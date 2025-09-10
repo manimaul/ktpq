@@ -9,14 +9,6 @@ import libpq.*
 const val TEXT_RESULT_FORMAT = 0
 const val BINARY_RESULT_FORMAT = 1
 
-var pgDebug = false
-
-fun pgDbLogD(msg: String) {
-    if (pgDebug) {
-        println(msg)
-    }
-}
-
 private val charPool: List<Char> = (('a'..'z') + ('A'..'Z'))
 
 fun generateRandomString(length: Int): String {
@@ -70,23 +62,20 @@ val CPointer<PGresult>.rows: Long
 
 fun CPointer<PGresult>?.check(conn: CPointer<PGconn>): CPointer<PGresult> {
     val status = PQresultStatus(this)
-    if (pgDebug) {
-        val statusStr = when(status) {
-            PGRES_EMPTY_QUERY -> "PGRES_EMPTY_QUERY"
-            PGRES_COMMAND_OK -> "PGRES_COMMAND_OK"
-            PGRES_TUPLES_OK -> "PGRES_TUPLES_OK"
-            PGRES_COPY_OUT -> "PGRES_COPY_OUT"
-            PGRES_COPY_IN -> "PGRES_COPY_IN"
-            PGRES_BAD_RESPONSE -> "PGRES_BAD_RESPONSE"
-            PGRES_NONFATAL_ERROR -> "PGRES_NONFATAL_ERROR"
-            PGRES_FATAL_ERROR -> "PGRES_FATAL_ERROR"
-            PGRES_COPY_BOTH -> "PGRES_COPY_BOTH"
-            else -> "$status"
-        }
-        pgDbLogD("status ($status) = $statusStr")
-    }
+//    val statusStr = when (status) {
+//        PGRES_EMPTY_QUERY -> "PGRES_EMPTY_QUERY"
+//        PGRES_COMMAND_OK -> "PGRES_COMMAND_OK"
+//        PGRES_TUPLES_OK -> "PGRES_TUPLES_OK"
+//        PGRES_COPY_OUT -> "PGRES_COPY_OUT"
+//        PGRES_COPY_IN -> "PGRES_COPY_IN"
+//        PGRES_BAD_RESPONSE -> "PGRES_BAD_RESPONSE"
+//        PGRES_NONFATAL_ERROR -> "PGRES_NONFATAL_ERROR"
+//        PGRES_FATAL_ERROR -> "PGRES_FATAL_ERROR"
+//        PGRES_COPY_BOTH -> "PGRES_COPY_BOTH"
+//        else -> "$status"
+//    }
+//    println("check status=$$statusStr")
     check(status == PGRES_TUPLES_OK || status == PGRES_COMMAND_OK || status == PGRES_COPY_IN) {
-        pgDbLogD("clear")
         clear()
         conn.error(false)
     }
@@ -96,7 +85,7 @@ fun CPointer<PGresult>?.check(conn: CPointer<PGconn>): CPointer<PGresult> {
 private fun CPointer<PGconn>?.error(finish: Boolean): String {
     val errorMessage = PQerrorMessage(this)?.toKString()
     if (errorMessage?.isNotEmpty() == true) {
-        pgDbLogD("error = $errorMessage")
+        println("error = $errorMessage")
     }
     if (finish) {
         this?.let {
@@ -108,7 +97,6 @@ private fun CPointer<PGconn>?.error(finish: Boolean): String {
 }
 
 internal fun CPointer<PGresult>?.clear() {
-    pgDbLogD("clearing result $this")
     PQclear(this)
 }
 

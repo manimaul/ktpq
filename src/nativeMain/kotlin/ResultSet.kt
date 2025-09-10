@@ -72,12 +72,13 @@ class PgResultSet(
         arr.filterNotNull()
     }
 
-    override val rows: Long = cursorName?.let {
-        result?.let { ptr ->
-            val rowCount = PQcmdTuples(ptr)?.toKString()?.toLongOrNull()
-            rowCount
-        } ?: 0
-    } ?: PQntuples(result).toLong()
+    override val rows: Long =
+        if (cursorName != null) {
+            result?.let { PQcmdTuples(it)?.toKString()?.toLongOrNull() } ?: 0L
+        } else {
+            result?.let { PQntuples(it).toLong() } ?: 0L
+        }
+
 
     private fun nextWithCursor(): Boolean {
         if (currentRowIndex == maxRowIndex) {
@@ -85,13 +86,11 @@ class PgResultSet(
         }
         if (currentRowIndex == -1) {
             clearResult()
-            pgDbLogD("next $cursorName fetching forward 100")
             result = PQexec(conn, "FETCH FORWARD 100 FROM $cursorName").check(conn)
             maxRowIndex = PQntuples(result) - 1
         }
         return if (currentRowIndex < maxRowIndex) {
             currentRowIndex += 1
-            pgDbLogD("next $cursorName cursor $currentRowIndex of $maxRowIndex")
             true
         } else {
             false
@@ -107,7 +106,6 @@ class PgResultSet(
             }
             return if (currentRowIndex < maxRowIndex) {
                 currentRowIndex += 1
-                pgDbLogD("next null cursor $currentRowIndex of $maxRowIndex")
                 true
             } else {
                 false
@@ -242,10 +240,8 @@ class PgResultSet(
     }
 
     override fun close() {
-        pgDbLogD("clearing result")
         clearResult()
         if (cursorName != null) {
-            pgDbLogD("closing cursor '$cursorName' and ending transaction")
             conn.exec("CLOSE $cursorName")
             conn.exec("END")
         }

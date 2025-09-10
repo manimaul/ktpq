@@ -16,12 +16,8 @@ open class PgStatement(
     val parameters = pattern.findAll(sql).count()
 
     override fun executeQuery(): ResultSet {
-        pgDbLogD("starting transaction")
         pgDb.conn.exec("BEGIN")
         val cursor = generateRandomString(8)
-        if (pgDebug) {
-            println("executing query $sql with parameters $parameters")
-        }
         return if (parameters > 0) {
             val result = memScoped {
                 PQexecParams(
@@ -35,14 +31,12 @@ open class PgStatement(
                     resultFormat = TEXT_RESULT_FORMAT
                 )
             }.check(pgDb.conn)
-            pgDbLogD("opening cursor '$cursor'")
             PgResultSet(cursor, result, pgDb.conn)
         } else {
             pgDb.conn.exec("DECLARE $cursor CURSOR FOR $sql")
             val result = memScoped {
                 PQexec(pgDb.conn, sql).check(pgDb.conn)
             }.check(pgDb.conn)
-            pgDbLogD("opening cursor '$cursor'")
             return PgResultSet(cursor, result, pgDb.conn)
         }
     }

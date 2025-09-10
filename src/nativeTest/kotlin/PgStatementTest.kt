@@ -24,7 +24,6 @@ class PgStatementTest {
 
     @BeforeTest
     fun beforeEach() {
-        pgDebug = true
         ds = PgDataSource("postgresql://admin:mysecretpassword@localhost:5432/s57server", 1)
         assertEquals(1, ds.readyCount)
         runBlocking {
