@@ -5,7 +5,6 @@ import kotlinx.cinterop.get
 import kotlinx.cinterop.toKString
 import libpq.PGconn
 import libpq.PGresult
-import libpq.PQclear
 import libpq.PQcmdTuples
 import libpq.PQexec
 import libpq.PQfname
@@ -23,8 +22,8 @@ interface ResultSet : AutoCloseable {
     val rows: Long
     fun next(): Boolean
 
-    fun getArray(index: Int): Array<String>
-    fun getArray(key: String): Array<String>
+    fun getArray(index: Int): Array<String?>
+    fun getArray(key: String): Array<String?>
     fun getString(index: Int): String
     fun getString(key: String): String
 
@@ -116,11 +115,12 @@ class PgResultSet(
         }
     }
 
-    override fun getArray(index: Int): Array<String> {
-        return emptyArray()
+    override fun getArray(index: Int): Array<String?> {
+        val strArr = getString(index)
+        return parsePqArray(strArr).toTypedArray()
     }
 
-    override fun getArray(key: String): Array<String> {
+    override fun getArray(key: String): Array<String?> {
         return getArray(PQfnumber(result, key))
     }
 

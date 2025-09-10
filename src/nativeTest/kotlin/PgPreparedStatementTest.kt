@@ -263,20 +263,20 @@ class PgPreparedStatementTest {
                     .setString(++i, "baz")
                     .setArray(++i, arrayOf("d", "e", "f")).execute()
 
-                conn.statement("select * from testing where json_b->>'key'='value';")
+                conn.statement("select * from testing where name='bar';")
                     .executeQuery().use { result ->
-                        assertTrue(result.next())
-                        assertEquals(1, result.rows)
+                        assertEquals(1, result.rows, "1st query rows")
+                        assertTrue(result.next(), "1st query next")
                         println(result.keys)
                         assertEquals("bar", result.getString("name"))
                         assertEquals(1L, result.getLong("id"))
                         assertEquals(arrayOf("a", "b", "c").toList(), result.getArray("array_t").toList())
-                        assertFalse(result.next())
+                        assertFalse(result.next(), "1st query next")
                     }
-                conn.statement("select * from testing where json_b->>'key'='0.3';")
+                conn.statement("select * from testing where name='baz';")
                     .executeQuery().use { result ->
-                        assertTrue(result.next())
-                        assertEquals(1, result.rows)
+                        assertEquals(1, result.rows, "2nd query rows")
+                        assertTrue(result.next(), "2nd query next")
                         println(result.keys)
                         assertEquals("baz", result.getString("name"))
                         assertEquals(2L, result.getLong("id"))
