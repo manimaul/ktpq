@@ -18,7 +18,7 @@ repositories {
 
 sourceSets {
     nativeMain.dependencies {
-        implementation("io.madrona:libpq:1.0-SNAPSHOT")
+	implementation("io.madrona:ktpq:1.0-SNAPSHOT")
     }
 }
 ```
