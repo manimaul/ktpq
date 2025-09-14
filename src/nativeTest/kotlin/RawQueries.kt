@@ -77,8 +77,8 @@ class RawQueries {
 
             res.clear()
 
-            assertEquals(listOf("id", "name", "json_b", "array_t", "data_b"), keys)
-            assertEquals(5, numberOfFields)
+            assertEquals(listOf("id", "name", "json_b", "array_t", "data_b", "truth"), keys)
+            assertEquals(6, numberOfFields)
             assertEquals(listOf("2,baz"), results)
         }
     }
@@ -126,7 +126,7 @@ class RawQueries {
                 results.add("$id,$name")
             }
             res.clear()
-            assertEquals(5, numberOfFields)
+            assertEquals(6, numberOfFields)
             assertEquals(listOf("1,bar", "3,zab"), results)
         }
     }
@@ -189,7 +189,7 @@ class RawQueries {
             PQexec(pgConn, "CLOSE my_cursor").check(pgConn)
             PQexec(pgConn, "END").check(pgConn)
 
-            assertEquals(5, numberOfFields)
+            assertEquals(6, numberOfFields)
             assertEquals(listOf("1,bar", "3,zab"), results)
         }
     }

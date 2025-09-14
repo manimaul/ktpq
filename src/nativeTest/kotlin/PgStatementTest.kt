@@ -16,7 +16,8 @@ const val testDbSql = """
         name    VARCHAR   UNIQUE NOT NULL,
         json_b  JSONB     NULL,
         array_t VARCHAR[] NULL,
-        data_b    BYTEA   NULL
+        data_b  BYTEA     NULL,
+        truth   BOOLEAN   DEFAULT FALSE
     );
 """
 
@@ -288,6 +289,33 @@ class PgStatementTest {
                         assertEquals(1L, it.getLong("id"))
                         assertEquals("bar", it.getString("name"))
                         assertEquals(byteArrayOf(3, 5, 7).toList(), it.getBytes("data_b").toList())
+                    }
+            }
+        }
+    }
+
+    @Test
+    fun testBooleanData() {
+        runBlocking {
+            ds.connection().use { conn ->
+                conn.statement("insert into testing (id, name, truth) VALUES ($1, $2, $3), ($4, $5, $6) returning *;")
+                    .setLong(1, 0L)
+                    .setString(2, "foo")
+                    .setBool(3, false)
+                    .setLong(4, 1L)
+                    .setString(5, "bar")
+                    .setBool(6, true)
+                    .executeReturning().use {
+                        assertEquals(2, it.totalRows)
+                        it.next()
+                        assertEquals(0L, it.getLong("id"))
+                        assertEquals("foo", it.getString("name"))
+                        assertFalse(it.getBoolean("truth"))
+
+                        it.next()
+                        assertEquals(1L, it.getLong("id"))
+                        assertEquals("bar", it.getString("name"))
+                        assertTrue(it.getBoolean("truth"))
                     }
             }
         }

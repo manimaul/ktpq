@@ -141,7 +141,7 @@ class PgResultSet(
     }
 
     override fun getBoolean(index: Int): Boolean {
-        return getString(index).toBoolean()
+        return getString(index) == "t"
     }
 
     override fun getString(key: String): String {
